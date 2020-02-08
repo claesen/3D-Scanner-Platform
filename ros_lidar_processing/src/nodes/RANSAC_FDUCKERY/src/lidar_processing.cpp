@@ -154,7 +154,6 @@ void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
             high_dist_inds.push_back(i);
         }
     }
-    std::cout << high_dist_inds.size() << std::endl;
 
 
     // Compute edges for the bins:
@@ -183,10 +182,11 @@ void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
         y_edges.push_back(y_min + i * y_rez);
     }
 
-    std::vector<int> bins[n_bins][n_bins];
+    std::vector<int> bins[n_bins*n_bins];
 
     std::vector<int> inds_tmp;
 
+    int bin_idx = 0;
     for (int y_i = 0; y_i < n_bins; y_i++){
 
         inds_tmp.clear();
@@ -194,7 +194,7 @@ void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
         auto y_edge_i = y_edges.at(y_i);
         auto y_edge_ip1 = y_edges.at(y_i+1);
 
-        for (int y_j = 0; y_j < n_pts; y_j++){
+        for (int y_j : high_dist_inds){
 
             auto y_pt = cloud->points.at(y_j).y;
 
@@ -210,94 +210,38 @@ void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
 
             for(auto x_j : inds_tmp){
 
-                auto x_pt = cloud->points.at(x_j).y;
+                auto x_pt = cloud->points.at(x_j).x;
 
                 if(x_pt >= x_edge_i && x_pt < x_edge_ip1){
-                    bins[y_i][x_i].push_back(x_j);
+                    bins[bin_idx].push_back(x_j);
                 }
+
             }
+            bin_idx++;
         }
     }
-
-    for (auto & bin_i : bins){
-        for (auto & bin : bin_i) {
-            std::cout << bin.size() << ",/ ";
-            if (bin.size() > 0) {
-                std::cout << bin.size() << ", ";
-            }
-        }
-    }
-
-    std::cout << std::endl;
-
-/*
-    // Distribute point in bins
-    std::vector<int> bins[n_bins][n_bins];
-
-    for (int i = 0; i < n_pts; i++){
-
-        int y_edge_idx = n_bins+1;
-        int x_edge_idx = n_bins+1;
-
-        auto& y_pt = cloud->points.at(i).y;
-        auto& x_pt = cloud->points.at(i).x;
-
-        // Find y-bin index:
-        for(int y_i = 0; y_i < n_bins; y_i++){
-            if(y_pt >= y_edges.at(y_i) && y_pt < y_edges.at(y_i + 1)){
-                y_edge_idx = y_i;
-                break;
-            }
-        }
-
-        if(y_edge_idx == n_bins+1){
-            continue;
-        }
-
-        // Find y-bin index:
-        for(int x_i = 0; x_i < n_bins; x_i++){
-            if(x_pt >= x_edges.at(x_i) && x_pt < x_edges.at(x_i + 1)){
-                x_edge_idx = x_i;
-                break;
-            }
-        }
-
-        if(x_edge_idx == n_bins+1){
-            continue;
-        }
-
-        bins[y_edge_idx][x_edge_idx].push_back(i);
-    }*/
 
     // Filter based on density and height diff in individual bins
-    int a = 0;
-    int b = 0;
-    int c = 0;
-    for (auto & bin_i : bins){
-        for(auto& bin : bin_i) {
-            c++;
-            if (bin.size() < density_threshold) {
-                continue;
-            }
-            a++;
-            double z_max = 0;
-            double z_min = FLT_MAX;
-            for (auto &bin_idx : bin) {
-                double z = cloud->points.at(bin_idx).z;
-                z_max = z > z_max ? z : z_max;
-                z_min = z < z_min ? z : z_min;
-            }
-            b++;
-            if (z_max - z_min <= height_diff_thresh) {
-                continue;
-            }
 
-            for (auto &ind : bin) {
-                inlier_indexes->push_back(ind);
-            }
+    for(auto& bin : bins) {
+        if (bin.size() < density_threshold) {
+            continue;
+        }
+        double z_max = 0;
+        double z_min = FLT_MAX;
+        for (auto &bin_idx : bin) {
+            double z = cloud->points.at(bin_idx).z;
+            z_max = z > z_max ? z : z_max;
+            z_min = z < z_min ? z : z_min;
+        }
+
+        if (z_max - z_min <= height_diff_thresh) {
+            continue;
+        }
+        for (auto &ind : bin) {
+            inlier_indexes->push_back(ind);
         }
     }
-    std::cout << a << ", " << b << ", " << c << std::endl;
 }
 
 void lidar_processor::execute()
@@ -306,9 +250,8 @@ void lidar_processor::execute()
     std::vector<int> inlier_inds;
     histogram_filtering(buffered_point_cloud, &inlier_inds, 100, 120.0, 10, 100.0);
 
-    std::cout << "post: " << inlier_inds.size() << std::endl;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(buffered_point_cloud->makeShared());
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(buffered_point_cloud);
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
     pcl::PointCloud<pcl::PointXYZ>::Ptr OGCLOUD((new pcl::PointCloud<pcl::PointXYZ>)); // Testing cloud
