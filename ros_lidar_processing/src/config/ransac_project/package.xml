@@ -1,0 +1,16 @@
+
+<package format="2">
+    <name>ransac_project</name>
+    <version>1.0.0</version>
+    <description>
+        This package provides foo capability.
+    </description>
+    <maintainer email="ivana@osrf.org">Ivana Bildbotz</maintainer>
+    <license>BSD</license>
+
+    <build_depend>roslaunch</build_depend>
+
+    <depend>tf</depend>
+    <depend>ransac_stuff</depend>
+
+</package>

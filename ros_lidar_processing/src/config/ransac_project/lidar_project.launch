@@ -1,0 +1,13 @@
+<launch>
+    <node pkg="tf"
+        type="static_transform_publisher"
+        name="link1_broadcaster"
+        args="0 0 0 0 0 0 world origin 100" />
+    <node pkg="tf"
+        type="static_transform_publisher"
+        name="link2_broadcaster"
+        args="0 0 0 0 0 0 map origin 100" />
+
+    <node pkg="ransac_stuff" type="ransac_stuff_node" name="ransac_stuff" output="screen" respawn="true" />
+
+</launch>

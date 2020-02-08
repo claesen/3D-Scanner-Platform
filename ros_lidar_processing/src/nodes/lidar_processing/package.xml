@@ -1,0 +1,26 @@
+<package format="2">
+    <name>lidar_processing</name>
+    <version>1.0.0</version>
+    <description>
+        This package provides foo capability.
+    </description>
+    <maintainer email="motherfucker@shit.org">Motherfucker</maintainer>
+    <license>BSD</license>
+
+    <depend>roscpp</depend>
+    <depend>rospy</depend>
+    <depend>std_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>pcl_conversions</depend>
+    <depend>pcl_ros</depend>
+    <depend>pcl_msgs</depend>
+    <depend>tf</depend>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>libpcl-all-dev</build_depend>
+
+    <exec_depend>libpcl-all</exec_depend>
+
+</package>
+

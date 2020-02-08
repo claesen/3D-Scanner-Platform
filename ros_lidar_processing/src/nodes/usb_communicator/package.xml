@@ -1,0 +1,19 @@
+<package format="2">
+    <name>usb_communicator</name>
+    <version>1.0.0</version>
+    <description>
+        This package provides foo capability.
+    </description>
+    <maintainer email="motherfucker@shit.org">Motherfucker</maintainer>
+    <license>BSD</license>
+
+    <depend>roscpp</depend>
+    <depend>rospy</depend>
+    <depend>std_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>lidar_command_message</depend>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+</package>
+
