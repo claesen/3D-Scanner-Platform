@@ -20,6 +20,17 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 
+struct Color
+{
+    int r;
+    int g;
+    int b;
+    int a;
+};
+
+
+
+
 // Neat struct to hold all topic name definitions in one
 struct Topics_Config
 {
@@ -57,13 +68,27 @@ class lidar_processor
         void publish_OGCLOUD();
         void publish_plane();
         void publish_histogram_inliers();
-        void populate_histogram_filtering_msg(std::vector<int>* inlier_idxs);
-        void populate_inliers_msg(pcl::PointIndices::Ptr inlier_idxs);
+        void populate_histogram_filtering_msg(pcl::PointIndices::Ptr inlier_idxs);
+        void populate_inliers_msg(pcl::PointIndices::Ptr inlier_idxs, pcl::PointCloud<pcl::PointXYZ>::Ptr);
         void populate_OGCLOUD_msg(pcl::PointCloud<pcl::PointXYZ>::Ptr OGCLOUD);
         void populate_plane_msg(pcl::ModelCoefficients::Ptr plane_coefs);
         void convert_back();
 
-        void histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud, std::vector<int>* inlier_indexes, int n_bins, double min_dist, int density_threshold, double height_diff_thresh);
+        void histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
+                                    pcl::PointIndices::Ptr inlier_indexes,
+                                    int n_bins, double min_dist,
+                                    int density_threshold,
+                                    double height_diff_thresh);
+
+        void pointIndices_to_cloud(pcl::PointIndices::Ptr inlier_idxs,
+                                   pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
+                                   pcl::PointCloud<pcl::PointXYZ>::Ptr outCloud);
+
+        void pointIndices_to_cloud_rgba(pcl::PointIndices::Ptr inlier_idxs,
+                                        pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
+                                        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr outCloud,
+                                        Color* color);
+
 
         pcl::PointCloud<pcl::PointXYZ> *buffered_point_cloud;
         pcl::PointCloud<pcl::PointXYZRGBA> *cached_message;

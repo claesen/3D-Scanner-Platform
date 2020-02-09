@@ -113,17 +113,23 @@ void RANSAC(pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
     segmentation.setMaxIterations(1000);
 
     segmentation.segment (*inliers, *coefficients);
+
+    std::cout << "Model coefficients: " << coefficients->values[0] << " "
+              << coefficients->values[1] << " "
+              << coefficients->values[2] << " "
+              << coefficients->values[3] << std::endl;
+    std::cout << "N_inliers: " << inliers->indices.size() << std::endl;
 }
 
 
-void Extract_indices(pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
+void extract_indices(pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
                      pcl::PointCloud<pcl::PointXYZ>::Ptr outCloud,
                      pcl::PointIndices::Ptr indices)
 {
     pcl::ExtractIndices<pcl::PointXYZ> extract;
     extract.setInputCloud (inCloud);
     extract.setIndices(indices);
-    extract.setNegative(false);
+    extract.setNegative(true);
     extract.filter(*outCloud);
 }
 
@@ -139,7 +145,13 @@ void Voxelgrid_downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud, pcl::Poin
 
 
 
-void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud, std::vector<int>* inlier_indexes, int n_bins, double min_dist, int density_threshold, double height_diff_thresh){
+void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
+                                        pcl::PointIndices::Ptr inlier_indexes,
+                                        int n_bins,
+                                        double min_dist,
+                                        int density_threshold,
+                                        double height_diff_thresh)
+{
 
     if(density_threshold < 2){
         density_threshold = 2;
@@ -239,37 +251,77 @@ void lidar_processor::histogram_filtering(pcl::PointCloud<pcl::PointXYZ>* cloud,
             continue;
         }
         for (auto &ind : bin) {
-            inlier_indexes->push_back(ind);
+            inlier_indexes->indices.push_back(ind);
         }
     }
 }
 
 void lidar_processor::execute()
 {
-    // Here is where any processing (e.g. on the buffered cloud) should be preformed
-    std::vector<int> inlier_inds;
-    histogram_filtering(buffered_point_cloud, &inlier_inds, 100, 120.0, 10, 100.0);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(buffered_point_cloud->makeShared());
+    pcl::PointCloud<pcl::PointXYZ>::Ptr PostFilterCloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr OGCLOUD(new pcl::PointCloud<pcl::PointXYZ>);
+
+
+    pcl::PointIndices::Ptr inlier_inds (new pcl::PointIndices);
+
+    std::vector<pcl::PointIndices::Ptr> inliers_vec;
+    pcl::PointIndices::Ptr inliers1 (new pcl::PointIndices);
+    pcl::PointIndices::Ptr inliers2 (new pcl::PointIndices);
+    pcl::PointIndices::Ptr inliers3 (new pcl::PointIndices);
+    pcl::PointIndices::Ptr inliers4 (new pcl::PointIndices);
+    pcl::PointIndices::Ptr inliers5 (new pcl::PointIndices);
+    inliers_vec.push_back(inliers1);
+    inliers_vec.push_back(inliers2);
+    inliers_vec.push_back(inliers3);
+    inliers_vec.push_back(inliers4);
+    inliers_vec.push_back(inliers5);
 
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr OGCLOUD((new pcl::PointCloud<pcl::PointXYZ>)); // Testing cloud
 
-    Voxelgrid_downsample(cloud, cloud);
+    histogram_filtering(buffered_point_cloud, inlier_inds, 100, 120.0, 10, 100.0);
 
-    RANSAC(cloud, inliers, coefficients);
 
-    pcl::PointIndices::Ptr inliers_cpy (inliers);
+    lidar_processor::pointIndices_to_cloud(inlier_inds, cloud, PostFilterCloud);
 
-    std::cout << "Model coefficients: " << coefficients->values[0] << " "
-              << coefficients->values[1] << " "
-              << coefficients->values[2] << " "
-              << coefficients->values[3] << std::endl;
-    std::cout << "N_inliers: " << inliers->indices.size() << std::endl;
+    Voxelgrid_downsample(PostFilterCloud, OGCLOUD);
 
-    populate_histogram_filtering_msg(&inlier_inds);
-    populate_inliers_msg(inliers);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ref0(OGCLOUD->makeShared());
+    RANSAC(OGCLOUD, inliers_vec[0], coefficients);
+    extract_indices(OGCLOUD, OGCLOUD, inliers_vec[0]);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ref1(OGCLOUD->makeShared());
+    RANSAC(OGCLOUD, inliers_vec[1], coefficients);
+    extract_indices(OGCLOUD, OGCLOUD, inliers_vec[1]);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ref2(OGCLOUD->makeShared());
+    RANSAC(OGCLOUD, inliers_vec[2], coefficients);
+    extract_indices(OGCLOUD, OGCLOUD, inliers_vec[2]);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ref3(OGCLOUD->makeShared());
+    RANSAC(OGCLOUD, inliers_vec[3], coefficients);
+    extract_indices(OGCLOUD, OGCLOUD, inliers_vec[3]);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ref4(OGCLOUD->makeShared());
+    RANSAC(OGCLOUD, inliers_vec[4], coefficients);
+    extract_indices(OGCLOUD, OGCLOUD, inliers_vec[4]);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr uno(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr dos(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tres(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr quattro(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cinco(new pcl::PointCloud<pcl::PointXYZ>);
+
+
+    lidar_processor::pointIndices_to_cloud(inliers_vec[0], ref0, uno);
+    lidar_processor::pointIndices_to_cloud(inliers_vec[1], ref1, dos);
+    lidar_processor::pointIndices_to_cloud(inliers_vec[2], ref2, tres);
+    lidar_processor::pointIndices_to_cloud(inliers_vec[3], ref3, quattro); // AKA TV
+    lidar_processor::pointIndices_to_cloud(inliers_vec[4], ref4, cinco);
+
+    populate_histogram_filtering_msg(inlier_inds);
+    populate_inliers_msg(inliers_vec[4], ref4);
     populate_plane_msg(coefficients);
     populate_OGCLOUD_msg(OGCLOUD);
 }
@@ -295,11 +347,51 @@ void lidar_processor::publish_plane()
     plane_pub.publish(*plane_msg);
 }
 
-void lidar_processor::publish_histogram_inliers(){
+void lidar_processor::publish_histogram_inliers()
+{
     histogram_inliers_pub.publish((*histogram_inliers_msg));
 }
 
-void lidar_processor::populate_histogram_filtering_msg(std::vector<int>* inlier_idxs)
+
+void lidar_processor::pointIndices_to_cloud(pcl::PointIndices::Ptr inlier_idxs,
+                        pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
+                        pcl::PointCloud<pcl::PointXYZ>::Ptr outCloud)
+{
+    for (auto &index: inlier_idxs->indices) {
+        auto &point = inCloud->points[index];
+        pcl::PointXYZ point_xyz;
+        point_xyz.x = point.x;
+        point_xyz.y = point.y;
+        point_xyz.z = point.z;
+        outCloud->push_back(point_xyz);
+    }
+}
+
+void lidar_processor::pointIndices_to_cloud_rgba(pcl::PointIndices::Ptr inlier_idxs,
+                                pcl::PointCloud<pcl::PointXYZ>::Ptr inCloud,
+                                pcl::PointCloud<pcl::PointXYZRGBA>::Ptr outCloud,
+                                Color* color)
+{
+    for (auto &index: inlier_idxs->indices) {
+        auto &point = inCloud->points[index];
+        pcl::PointXYZRGBA point_rgba;
+        point_rgba.x = point.x;
+        point_rgba.y = point.y;
+        point_rgba.z = point.z;
+        point_rgba.rgba =
+        point_rgba.r = color->r;
+        point_rgba.g = color->g;
+        point_rgba.b = color->b;
+        point_rgba.a = color->a;
+        outCloud->push_back(point_rgba);
+    }
+}
+
+
+
+
+
+void lidar_processor::populate_histogram_filtering_msg(pcl::PointIndices::Ptr inlier_idxs)
 {
     // Populates the input message pointer with the current buffered cloud
 
@@ -308,8 +400,9 @@ void lidar_processor::populate_histogram_filtering_msg(std::vector<int>* inlier_
     // Defines the frame in which the point is defined in reference to, i.e. the origo in reference to each points coordinate
     histogram_inliers_msg->header.frame_id = world_frame;
 
+
     // Converts all points one by one to format which rviz can handle:
-    for (auto &index: *inlier_idxs){
+    for (auto &index: inlier_idxs->indices){
         auto &point = buffered_point_cloud->points[index];
         pcl::PointXYZRGBA point_rgba;
         point_rgba.x = point.x;
@@ -324,7 +417,8 @@ void lidar_processor::populate_histogram_filtering_msg(std::vector<int>* inlier_
     }
 }
 
-void lidar_processor::populate_inliers_msg(pcl::PointIndices::Ptr inlier_idxs)
+void lidar_processor::populate_inliers_msg(pcl::PointIndices::Ptr inlier_idxs,
+                                           pcl::PointCloud<pcl::PointXYZ>::Ptr cloud )
 {
     // Populates the input message pointer with the current buffered cloud
 
@@ -335,7 +429,7 @@ void lidar_processor::populate_inliers_msg(pcl::PointIndices::Ptr inlier_idxs)
 
     // Converts all points one by one to format which rviz can handle:
     for (auto &index: inlier_idxs->indices){
-        auto &point = buffered_point_cloud->points[index];
+        auto &point = cloud->points[index];
         pcl::PointXYZRGBA point_rgba;
         point_rgba.x = point.x;
         point_rgba.y = point.y;
